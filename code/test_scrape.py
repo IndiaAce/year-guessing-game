@@ -8,8 +8,17 @@ def is_significant_event(event_text: str) -> bool:
         "pandemic", "death", "dies",
         "first", "king", "queen", "president", "leader",
         "dictator", "mass", "murder", "crisis", "earthquake",
+        "election", "vote", "battle", "war", "treaty", "revolution",
+        "independence", "constitution", "launch", "discovery", "invent",
+        "landing", "protest", "strike", "riot", "assassination",
+        "flood", "hurricane", "tsunami", "volcano", "stock", "inflation"
     ]
     return any(word in event_text.lower() for word in keywords) and len(event_text.split()) >= 8
+
+def obfuscate_year(event_text: str, year: int) -> str:
+    # replace exact year occurrences with 'XXXX'
+    pattern = r'\b' + re.escape(str(year)) + r'\b'
+    return re.sub(pattern, 'XXXX', event_text)
 
 API_URL = "https://en.wikipedia.org/w/api.php"
 HEADERS = {
@@ -77,7 +86,8 @@ def fetch_events_via_api(year: int, max_events: int = 4) -> list[str]:
 def gameplay_loop(events: list[str], year: int, attempts: int = 3) -> None:
     print("\nGuess the year for the following events:\n")
     for i, event in enumerate(events, 1):
-        print(f"{i}. {event}")
+        obf = obfuscate_year(event, year)
+        print(f"{i}. {obf}")
     for attempt in range(1, attempts + 1):
         guess = input(f"\nAttempt {attempt}/{attempts} - Your guess: ")
         try:
