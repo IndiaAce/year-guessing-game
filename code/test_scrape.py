@@ -1,6 +1,15 @@
 import requests
 import re
+import random
 from bs4 import BeautifulSoup
+
+def is_significant_event(event_text: str) -> bool:
+    keywords = [
+        "pandemic", "death", "dies",
+        "first", "king", "queen", "president", "leader",
+        "dictator", "mass", "murder", "crisis", "earthquake",
+    ]
+    return any(word in event_text.lower() for word in keywords) and len(event_text.split()) >= 8
 
 API_URL = "https://en.wikipedia.org/w/api.php"
 HEADERS = {
@@ -11,7 +20,7 @@ HEADERS = {
     )
 }
 
-def fetch_events_via_api(year: int, max_events: int = 20) -> list[str]:
+def fetch_events_via_api(year: int, max_events: int = 4) -> list[str]:
     # 1) Retrieve the list of sections on the page
     sec_params = {
         "action": "parse",
@@ -65,35 +74,27 @@ def fetch_events_via_api(year: int, max_events: int = 20) -> list[str]:
         print(f"[!] No events found for {year} in any month")
     return events
 
+def gameplay_loop(events: list[str], year: int, attempts: int = 3) -> None:
+    print("\nGuess the year for the following events:\n")
+    for i, event in enumerate(events, 1):
+        print(f"{i}. {event}")
+    for attempt in range(1, attempts + 1):
+        guess = input(f"\nAttempt {attempt}/{attempts} - Your guess: ")
+        try:
+            if int(guess) == year:
+                print("You nailed it!")
+                return
+        except ValueError:
+            print("Please enter a valid number.")
+            continue
+        print("Wrong guess.")
+    print(f"\nOut of attempts! The year was {year}.")
+
 if __name__ == "__main__":
-    year = 2019
-    evts = fetch_events_via_api(year)
-    print(f"\nTop Events from {year} (via API):\n")
-    for i, e in enumerate(evts, 1):
-        print(f"{i}. {e}")
-
-# Todo: 
-    #Implement the following function to attempt some heuristic bullshit
-'''
-def is_significant_event(event_text: str) -> bool:
-    keywords = [
-        "list of words", "pandemic", "death", "dies", 
-        "first", "king", "queen", "president", "leader", 
-        "dictator", "mass", "murder", "crisis", "earthquake", 
-        ]
-    return any(word in event_text.lower() for word in keywords) and len(event_text.spli() >=8)    
-'''
-    # Can do this with spaCy too for some NLP but that might require more work... something like this:
-'''
-import spacy
-nlp = spacy.load("en_core_web_sm")
-
-def get_event_score(text):
-    doc = nlp(text)
-    entity_count = len([ent for ent in doc.ents if ent.label_ in ("GPE", "ORG", "PERSON")])
-    verb_count = len([token for token in doc if token.pos_ == "VERB"])
-    return entity_count + verb_count
-
-# Example use
-scored_events = sorted(events, key=get_event_score, reverse=True)
-'''
+    year_choice = [2025, 2019, 2016, 2012, 2001, 2000, 1980, 1964, 1934, 1914, 1913, 1912, 1812]
+    year = random.choice(year_choice)
+    raw_events = fetch_events_via_api(year, max_events=20)
+    sig_events = [e for e in raw_events if is_significant_event(e)]
+    selected = sig_events if len(sig_events) >= 4 else raw_events
+    events = random.sample(selected, 4)
+    gameplay_loop(events, year)
