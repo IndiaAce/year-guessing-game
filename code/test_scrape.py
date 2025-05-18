@@ -3,6 +3,78 @@ import re
 import random
 from bs4 import BeautifulSoup
 
+def display_board(events, event_year_map, ungrouped_ids, year_letters):
+    print("\nGroup the 16 events into the correct years:\n")
+    for i in sorted(ungrouped_ids):
+        ev = events[i-1]
+        obf = obfuscate_year(ev, event_year_map[i])
+        print(f"{i}. {obf}")
+    print("\nYears:")
+    for letter, y in year_letters.items():
+        print(f"{letter}) {y}")
+    print()
+
+def connections_game(year_choices):
+    import random
+    # pick 4 distinct years
+    years = random.sample(year_choices, 4)
+    # fetch events per year
+    events_by_year = {}
+    for y in years:
+        raw = fetch_events_via_api(y, max_events=50)
+        sig = [e for e in raw if is_significant_event(e)]
+        if len(sig) < 4:
+            raw = fetch_events_via_api(y, max_events=100)
+            sig = [e for e in raw if is_significant_event(e)]
+        if len(sig) < 4:
+            raise ValueError(f"Not enough significant events for year {y}")
+        events_by_year[y] = random.sample(sig, 4)
+    # flatten and map ids
+    events_flat = []
+    event_year_map = {}
+    for y in years:
+        for ev in events_by_year[y]:
+            idx = len(events_flat) + 1
+            events_flat.append(ev)
+            event_year_map[idx] = y
+    # setup game state
+    ungrouped = set(range(1, len(events_flat) + 1))
+    letters = dict(zip(["A", "B", "C", "D"], years))
+    groups_done = 0
+    total_groups = 4
+    # main loop
+    while groups_done < total_groups:
+        display_board(events_flat, event_year_map, ungrouped, letters)
+        inp = input("Enter 4 event numbers and a year letter (e.g. '3 7 12 15 A'): ")
+        parts = inp.strip().split()
+        if len(parts) != 5:
+            print("Invalid input format.")
+            continue
+        *num_strs, let = parts
+        try:
+            ids = [int(n) for n in num_strs]
+        except ValueError:
+            print("Event IDs must be numbers.")
+            continue
+        let = let.upper()
+        if let not in letters:
+            print("Invalid year letter. Choose A-D.")
+            continue
+        chosen_year = letters[let]
+        # validate group
+        if any(i not in ungrouped for i in ids):
+            print("One or more event IDs already grouped or invalid.")
+            continue
+        if all(event_year_map[i] == chosen_year for i in ids):
+            groups_done += 1
+            for i in ids:
+                ungrouped.remove(i)
+            print(f"Correct! {total_groups - groups_done} groups to go.")
+        else:
+            correct = sum(1 for i in ids if event_year_map[i] == chosen_year)
+            print(f"{correct}/4 correct. Try again.")
+    print("Congratulations! You've grouped all events!")
+
 def is_significant_event(event_text: str) -> bool:
     keywords = [
         "pandemic", "death", "dies",
@@ -83,37 +155,6 @@ def fetch_events_via_api(year: int, max_events: int = 4) -> list[str]:
         print(f"[!] No events found for {year} in any month")
     return events
 
-def gameplay_loop(events: list[str], year: int, attempts: int = 3) -> None:
-    print("\nGuess the year for the following events:\n")
-    for i, event in enumerate(events, 1):
-        obf = obfuscate_year(event, year)
-        print(f"{i}. {obf}")
-    for attempt in range(1, attempts + 1):
-        guess = input(f"\nAttempt {attempt}/{attempts} - Your guess: ")
-        try:
-            if int(guess) == year:
-                print("You nailed it!")
-                return
-        except ValueError:
-            print("Please enter a valid number.")
-            continue
-        print("Wrong guess.")
-    print(f"\nOut of attempts! The year was {year}.")
-
 if __name__ == "__main__":
     year_choice = [2025, 2019, 2016, 2012, 2001, 2000, 1980, 1964, 1934, 1914, 1913, 1912, 1812]
-    year = random.choice(year_choice)
-    # fetch a larger batch and filter for significant events
-    raw_events = fetch_events_via_api(year, max_events=100)
-    sig_events = [e for e in raw_events if is_significant_event(e)]
-    # if not enough, fetch more and retry
-    if len(sig_events) < 4:
-        print(f"[!] Only {len(sig_events)} significant events found for {year}, fetching more.")
-        raw_events = fetch_events_via_api(year, max_events=200)
-        sig_events = [e for e in raw_events if is_significant_event(e)]
-    # ensure at least 4 events
-    if len(sig_events) < 4:
-        raise ValueError(f"Not enough significant events found for year {year}")
-    # pick 4 random significant events
-    events = random.sample(sig_events, 4)
-    gameplay_loop(events, year)
+    connections_game(year_choice)
