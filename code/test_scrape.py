@@ -103,8 +103,17 @@ def gameplay_loop(events: list[str], year: int, attempts: int = 3) -> None:
 if __name__ == "__main__":
     year_choice = [2025, 2019, 2016, 2012, 2001, 2000, 1980, 1964, 1934, 1914, 1913, 1912, 1812]
     year = random.choice(year_choice)
-    raw_events = fetch_events_via_api(year, max_events=20)
+    # fetch a larger batch and filter for significant events
+    raw_events = fetch_events_via_api(year, max_events=100)
     sig_events = [e for e in raw_events if is_significant_event(e)]
-    selected = sig_events if len(sig_events) >= 4 else raw_events
-    events = random.sample(selected, 4)
+    # if not enough, fetch more and retry
+    if len(sig_events) < 4:
+        print(f"[!] Only {len(sig_events)} significant events found for {year}, fetching more.")
+        raw_events = fetch_events_via_api(year, max_events=200)
+        sig_events = [e for e in raw_events if is_significant_event(e)]
+    # ensure at least 4 events
+    if len(sig_events) < 4:
+        raise ValueError(f"Not enough significant events found for year {year}")
+    # pick 4 random significant events
+    events = random.sample(sig_events, 4)
     gameplay_loop(events, year)
